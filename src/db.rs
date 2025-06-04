@@ -71,7 +71,7 @@ pub fn add_board(
     guild_id: String,
     name: String,
     reactions: Vec<ReactionType>,
-    min_reactions: Option<u32>,
+    min_reactions: Option<i64>,
     dest_channel: String,
 ) -> Result<()> {
     let conn = get_connection()?;

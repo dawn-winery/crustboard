@@ -5,15 +5,35 @@ use serenity::model::application::{CommandOptionType, ResolvedOption, ResolvedVa
 
 // find all occurances of the pattern <:text:emoji_id> or unicode emoji
 fn parse_reactions(reactions: String) -> Vec<ReactionType> {
-    let parsed_reactions = Vec::new();
+    let mut parsed_reactions = Vec::new();
 
-    todo!("Implement parsing of reactions");
+    // really bad implementation
+    for reaction in reactions.split_whitespace() {
+        if let Ok(reaction) = ReactionType::try_from(reaction) {
+            parsed_reactions.push(reaction);
+        }
+    }
+    let split_reactions = reactions.split(">").collect::<Vec<&str>>();
+    let len = split_reactions.len();
+    let reactions = split_reactions
+        .into_iter()
+        .take(len - 1)
+        .map(|r| r.trim().to_owned() + ">")
+        .collect::<Vec<String>>();
+    for reaction in reactions {
+        if let Ok(reaction) = ReactionType::try_from(reaction) {
+            parsed_reactions.push(reaction);
+        }
+    }
 
+    // filter out duplicates by converting each value back to string
+    parsed_reactions.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+    parsed_reactions.dedup_by(|a, b| a.to_string() == b.to_string());
     parsed_reactions
 }
 
 pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
-    let mut min_reactions: u32 = 0;
+    let mut min_reactions: i64 = 1;
     let mut dest_channel: String = String::new();
     let mut name: String = String::new();
     let mut reactions: String = String::new();
@@ -21,7 +41,7 @@ pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
     for option in options.iter() {
         match option.name {
             "min-reactions" => match option.value {
-                ResolvedValue::Integer(value) => min_reactions = value as u32,
+                ResolvedValue::Integer(value) => min_reactions = value,
                 _ => return "Invalid value for min-reactions".to_string(),
             },
             "dest-channel" => match option.value {

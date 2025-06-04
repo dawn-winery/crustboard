@@ -77,8 +77,16 @@ pub fn add_board(
     let conn = get_connection()?;
 
     conn.execute(
-        "INSERT INTO boards (guild_id, name, reactions, min_reactions, dest_channel) VALUES (?, ?, ?, ?, ?)",
-        (guild_id, name, to_csv(reactions), min_reactions.unwrap_or(5), dest_channel),
+        "INSERT INTO boards
+            (guild_id, name, reactions, min_reactions, dest_channel)
+            VALUES (?, ?, ?, ?, ?)",
+        (
+            guild_id,
+            name,
+            to_csv(reactions),
+            min_reactions.unwrap_or(5),
+            dest_channel,
+        ),
     )?;
 
     Ok(())
@@ -88,26 +96,44 @@ pub fn delete_board(guild_id: String, board_name: String) -> Result<()> {
     let conn = get_connection()?;
 
     conn.execute(
-        "DELETE FROM boards WHERE guild_id = ? AND name = ?",
+        "DELETE FROM boards
+            WHERE guild_id = ? AND name = ?",
         (guild_id, board_name),
     )?;
 
     Ok(())
 }
 
-// get board name and minimum reactions given the boards contain passed ReactionType
+// get board name, min_reactions and dest_channel given the boards contain passed ReactionType
 pub fn find_min_reactions(
     guild_id: String,
     reaction: ReactionType,
-) -> Result<Vec<(String, usize)>> {
+) -> Result<Vec<(String, usize, String)>> {
     let conn = get_connection()?;
 
     let mut stmt = conn.prepare(
-        "SELECT name, min_reactions FROM boards WHERE guild_id = ? AND reactions LIKE ?",
+        "SELECT name, min_reactions, dest_channel
+            FROM boards
+            WHERE guild_id = ? AND reactions LIKE ?",
     )?;
 
     stmt.query_map([guild_id, format!("%{}%", reaction)], |row| {
-        Ok((row.get(0)?, row.get(1)?))
+        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
     })?
-    .collect::<Result<Vec<(String, usize)>>>()
+    .collect::<Result<Vec<(String, usize, String)>>>()
+}
+
+pub fn get_message_dest(guild_id: String, source_id: String) -> Result<String> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT messages.dest_id
+            FROM messages
+            JOIN boards ON messages.board_id = boards.board_id
+            WHERE boards.guild_id = ? AND messages.source_id = ?",
+    )?;
+
+    let message_id: String = stmt.query_row([guild_id, source_id], |row| row.get(0))?;
+
+    Ok(message_id)
 }

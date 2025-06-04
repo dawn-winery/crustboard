@@ -73,7 +73,11 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        Command::create_global_command(&ctx.http, commands::addboard::register()).await;
+        Command::create_global_command(&ctx.http, commands::addboard::register())
+            .await
+            .unwrap_or_else(|why| {
+                panic!("Cannot register command: {why}");
+            });
 
         println!("{} is connected!", ready.user.name);
     }

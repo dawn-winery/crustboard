@@ -1,12 +1,12 @@
 use std::env;
 
 use serenity::async_trait;
-use serenity::model::{
-    channel::{Message, Reaction},
-    application::{Command, Interaction},
-    gateway::Ready
-};
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::model::{
+    application::{Command, Interaction},
+    channel::{Message, Reaction},
+    gateway::Ready,
+};
 use serenity::prelude::*;
 
 pub mod db;
@@ -22,35 +22,43 @@ impl EventHandler for Handler {
             Ok(message) => {
                 if let Some(guild_id) = added.guild_id {
                     // check if added reaction type is in boards
-
-
-                    if let Ok(users) = message.channel_id.reaction_users(ctx.http, message.id, added.emoji, None, None).await {
+                    if let Ok(users) = message
+                        .channel_id
+                        .reaction_users(ctx.http, message.id, added.emoji, None, None)
+                        .await
+                    {
                         // filter out author from reacted users
-                        let count = users
-                            .into_iter()
-                            .filter(|x| *x != message.author)
-                            .count();
+                        let count = if users.contains(&message.author) {
+                            users.len() - 1
+                        } else {
+                            users.len()
+                        };
 
-
+                        todo!(
+                            "check if reaction is in boards, if above board threshold, add to board"
+                        )
                     }
                 }
-            },
-            Err(e) => println!("{}", e)
+            }
+            Err(e) => println!("{}", e),
         }
     }
-    
+
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
             println!("Received command interaction: {command:#?}");
 
             let content = match command.data.name.as_str() {
-                "setchannel" => {
+                "addboard" => {
                     if let Some(guild_id) = command.guild_id {
-                        Some(commands::setchannel::run(guild_id.to_string(), &command.data.options()))
+                        Some(commands::addboard::run(
+                            guild_id.to_string(),
+                            &command.data.options(),
+                        ))
                     } else {
                         None
                     }
-                },
+                }
                 _ => Some("unimplemented".to_string()),
             };
 
@@ -65,9 +73,7 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let guild_command =
-            Command::create_global_command(&ctx.http, commands::setchannel::register())
-                .await;
+        Command::create_global_command(&ctx.http, commands::addboard::register()).await;
 
         println!("{} is connected!", ready.user.name);
     }
@@ -75,8 +81,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let token = env::var("DISCORD_TOKEN")
-        .expect("Expected a token in the environment");
+    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT

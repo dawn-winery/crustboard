@@ -1,30 +1,48 @@
-use rusqlite::{Connection, Result, Error};
+use rusqlite::{Connection, Error, Result};
 use serenity::model::channel::{Reaction, ReactionType};
 
-const DB_NAME: &str = "settings.db"; 
+const DB_NAME: &str = "settings.db";
+
+fn get_connection() -> Result<Connection> {
+    Connection::open(DB_NAME)
+}
 
 pub fn create_db() -> Result<()> {
     if !std::path::Path::new(DB_NAME).exists() {
-        let conn = Connection::open(DB_NAME)?;
+        let conn = get_connection()?;
 
-        conn.execute(
-            "CREATE TABLE guilds (
-                guild_id TEXT PRIMARY KEY, 
-                post_channel TEXT
-            )", ()
-        )?;
-
+        // min_reactions is the threshold for a message to be posted to the board
+        // reactions holds csv of reaction IDs
+        // dest_channel holds the channel ID of the channel that the message will be posted to
         conn.execute(
             "CREATE TABLE boards (
-                board_id INT PRIMARY KEY AUTOINCREMENT,
+                board_id INTEGER PRIMARY KEY AUTOINCREMENT,
 
                 guild_id TEXT,
                 name TEXT,
                 reactions TEXT,
-                min_reactions INT,
+                min_reactions INT
+                dest_channel TEXT,
+            )",
+            (),
+        )?;
 
-                FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
-            )", ()
+        // source_id holds the message ID of the message that passed the reaction threshold
+        // dest_id holds the message ID of the message that was posted to the board
+        // board_id holds the ID of the board that the message reached the threshold for
+        // reaction_count holds the number of reactions that is displayed on the destination message
+        conn.execute(
+            "CREATE TABLE messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                source_id TEXT,
+                dest_id TEXT,
+                board_id INTEGER,
+                reaction_count INTEGER,
+
+                FOREIGN KEY(board_id) REFERENCES boards(board_id)
+            )",
+            (),
         )?;
     }
 
@@ -32,76 +50,62 @@ pub fn create_db() -> Result<()> {
 }
 
 pub fn to_csv(values: Vec<ReactionType>) -> String {
-    values.into_iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+    values
+        .into_iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
+        .join(",")
 }
 
 pub fn from_csv(values: String) -> Vec<ReactionType> {
-    values.split(",").map(|x| ReactionType::try_from(x).ok_or(ReactionType::Unicode("ඞ".to_string()))).collect()
+    values
+        .split(",")
+        .filter_map(|x| match ReactionType::try_from(x) {
+            Ok(reaction) => Some(reaction),
+            Err(_) => Some(ReactionType::Unicode("ඞ".to_string())),
+        })
+        .collect()
 }
 
-pub fn add_guild(guild_id: String, post_channel: String) -> Result<()> {
-    let conn = Connection::open(DB_NAME)?;
+pub fn add_board(
+    guild_id: String,
+    name: String,
+    reactions: Vec<ReactionType>,
+    min_reactions: Option<u32>,
+    dest_channel: String,
+) -> Result<()> {
+    let conn = get_connection()?;
 
     conn.execute(
-        "INSERT OR INGORE INTO guilds (guild_id, post_channel) VALUES (?, ?)", 
-        (guild_id, post_channel)
+        "INSERT INTO boards (guild_id, name, reactions, min_reactions, dest_channel) VALUES (?, ?, ?, ?, ?)",
+        (guild_id, name, to_csv(reactions), min_reactions.unwrap_or(5), dest_channel),
     )?;
 
     Ok(())
 }
 
-pub fn guild_exists(guild_id: String) -> bool {
-    let Ok(conn) = Connection::open(DB_NAME) else { return false };
-    let Ok(mut stmt) = conn.prepare("SELECT * FROM guilds WHERE guild_id = ?") else { return false };
-    stmt.execute([guild_id]).is_ok()
-}
-
-pub fn set_channel(guild_id: String, channel_id: String) -> Result<()> {
-    let conn = Connection::open(DB_NAME)?;
-
-    if guild_exists(guild_id.clone()) {
-        conn.execute(
-            "UPDATE guilds WHERE guild_id = ? SET post_channel = ?",
-            (guild_id, channel_id)
-        )?;
-    } else {
-        conn.execute(
-            "INSERT INTO guilds (guild_id, post_channel) VALUES (?, ?)",
-            (guild_id, channel_id)
-        )?;
-    }
-
-    Ok(())
-}
-
-pub fn add_board(guild_id: String, name: String, reactions: Vec<ReactionType>, min_reactions: Option<u32>) -> Result<()> {
-    let conn = Connection::open(DB_NAME)?;
-
-    if guild_exists(guild_id.clone()) {
-        conn.execute(
-            "INSERT OR INGORE INTO boards (guild_id, name, reactions, min_reactions) VALUES (?, ?, ?, ?)", 
-            (guild_id, name, to_csv(reactions), min_reactions.unwrap_or(5))
-        )?;
-    }
-
-    Ok(())
-}
-
 pub fn delete_board(guild_id: String, board_name: String) -> Result<()> {
-    let conn = Connection::open(DB_NAME)?;
-    todo!();
+    let conn = get_connection()?;
+
+    conn.execute(
+        "DELETE FROM boards WHERE guild_id = ? AND name = ?",
+        (guild_id, board_name),
+    )?;
+
+    Ok(())
 }
 
-pub fn get_reaction_types(guild_id: String) -> Result<()> {
-    let conn = Connection::open(DB_NAME)?;
+// get a list of all reactions from all boards in a guild
+pub fn get_reaction_types(guild_id: String) -> Result<Vec<ReactionType>> {
+    let conn = get_connection()?;
 
-    if guild_exists(guild_id) {
-        let mut stmt = conn.prepare("SELECT reactions FROM boards WHERE guild_id = ?")?;
-        return stmt
-            .query_map([guild_id], |row| from_csv(row.get(0).unwrap_or("N/A".to_string())))?
-            .collect();
-    }
-
-    Err(Error::InvalidColumnName("Guild does not exist".to_string()))
+    let mut stmt = conn.prepare("SELECT reactions FROM boards WHERE guild_id = ?")?;
+    let mut reaction_types = stmt
+        .query_map([guild_id], |row| {
+            Ok(from_csv(row.get(0).unwrap_or("N/A".to_string())))
+        })?
+        .collect::<Result<Vec<Vec<ReactionType>>>>()?
+        .concat();
+    reaction_types.dedup();
+    Ok(reaction_types)
 }
-

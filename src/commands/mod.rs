@@ -1,1 +1,1 @@
-pub mod setchannel;
+pub mod addboard;

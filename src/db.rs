@@ -21,8 +21,8 @@ pub fn create_db() -> Result<()> {
                 guild_id TEXT,
                 name TEXT,
                 reactions TEXT,
-                min_reactions INT
-                dest_channel TEXT,
+                min_reactions INT,
+                dest_channel TEXT
             )",
             (),
         )?;

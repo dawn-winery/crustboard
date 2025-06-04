@@ -94,6 +94,8 @@ impl EventHandler for Handler {
                 panic!("Cannot register command: {why}");
             });
 
+        db::create_db().expect("Failed to create database");
+
         println!("{} is connected!", ready.user.name);
     }
 }

@@ -95,17 +95,19 @@ pub fn delete_board(guild_id: String, board_name: String) -> Result<()> {
     Ok(())
 }
 
-// get a list of all reactions from all boards in a guild
-pub fn get_reaction_types(guild_id: String) -> Result<Vec<ReactionType>> {
+// get board name and minimum reactions given the boards contain passed ReactionType
+pub fn find_min_reactions(
+    guild_id: String,
+    reaction: ReactionType,
+) -> Result<Vec<(String, usize)>> {
     let conn = get_connection()?;
 
-    let mut stmt = conn.prepare("SELECT reactions FROM boards WHERE guild_id = ?")?;
-    let mut reaction_types = stmt
-        .query_map([guild_id], |row| {
-            Ok(from_csv(row.get(0).unwrap_or("N/A".to_string())))
-        })?
-        .collect::<Result<Vec<Vec<ReactionType>>>>()?
-        .concat();
-    reaction_types.dedup();
-    Ok(reaction_types)
+    let mut stmt = conn.prepare(
+        "SELECT name, min_reactions FROM boards WHERE guild_id = ? AND reactions LIKE ?",
+    )?;
+
+    stmt.query_map([guild_id, format!("%{}%", reaction)], |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?
+    .collect::<Result<Vec<(String, usize)>>>()
 }

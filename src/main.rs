@@ -17,6 +17,7 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    // function is called when a reaction is added to a message
     async fn reaction_add(&self, ctx: Context, added: Reaction) {
         match added.message(&ctx.http).await {
             Ok(message) => {
@@ -24,7 +25,7 @@ impl EventHandler for Handler {
                     // check if added reaction type is in boards
                     if let Ok(users) = message
                         .channel_id
-                        .reaction_users(ctx.http, message.id, added.emoji, None, None)
+                        .reaction_users(ctx.http, message.id, added.emoji.clone(), None, None)
                         .await
                     {
                         // filter out author from reacted users
@@ -34,9 +35,23 @@ impl EventHandler for Handler {
                             users.len()
                         };
 
-                        todo!(
-                            "check if reaction is in boards, if above board threshold, add to board"
-                        )
+                        // get list of (boards, min_reactions) for the given reaction
+                        if let Ok(min_reactions) =
+                            db::find_min_reactions(guild_id.to_string(), added.emoji)
+                        {
+                            // filter by greater or equal to count (maybe just do this in the db query?)
+                            let min_reactions = min_reactions
+                                .iter()
+                                .filter(|&(_, min)| min <= &count)
+                                .collect::<Vec<_>>();
+
+                            // handle each board
+                            for (board_name, min) in min_reactions.iter() {
+                                todo!(
+                                    "query database to check if message is in board, if it is edit with new count, else post a new message with count"
+                                )
+                            }
+                        }
                     }
                 }
             }

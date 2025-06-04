@@ -67,16 +67,6 @@ pub fn register() -> CreateCommand {
         )
         .add_option(
             CreateCommandOption::new(
-                CommandOptionType::Integer,
-                "min-reactions",
-                "Minimum number of reactions",
-            )
-            .min_int_value(1)
-            .max_int_value(50)
-            .required(false),
-        )
-        .add_option(
-            CreateCommandOption::new(
                 CommandOptionType::Channel,
                 "dest-channel",
                 "Channel where the board will post messages",
@@ -90,5 +80,15 @@ pub fn register() -> CreateCommand {
                 "Reactions to use for the board",
             )
             .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "min-reactions",
+                "Minimum number of reactions",
+            )
+            .min_int_value(1)
+            .max_int_value(50)
+            .required(false),
         )
 }

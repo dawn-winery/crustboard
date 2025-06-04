@@ -18,38 +18,42 @@ pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
     let mut name: String = String::new();
     let mut reactions: String = String::new();
 
-    options.iter().for_each(|option| match option.name {
-        "min-reactions" => match option.value {
-            ResolvedValue::Integer(value) => min_reactions = value as u32,
-            _ => return "Invalid value for min-reactions".to_string(),
-        },
-        "dest-channel" => match option.value {
-            ResolvedValue::Channel(value) => dest_channel = value.id.to_string(),
-            _ => return "Invalid value for dest-channel".to_string(),
-        },
-        "name" => match option.value {
-            ResolvedValue::String(value) => name = value.to_string(),
-            _ => return "Invalid value for name".to_string(),
-        },
-        "reactions" => match option.value {
-            ResolvedValue::String(value) => reactions = value.to_string(),
-            _ => return "Invalid value for reactions".to_string(),
-        },
-        _ => return "Invalid option".to_string(),
-    });
+    for option in options.iter() {
+        match option.name {
+            "min-reactions" => match option.value {
+                ResolvedValue::Integer(value) => min_reactions = value as u32,
+                _ => return "Invalid value for min-reactions".to_string(),
+            },
+            "dest-channel" => match option.value {
+                ResolvedValue::Channel(value) => dest_channel = value.id.to_string(),
+                _ => return "Invalid value for dest-channel".to_string(),
+            },
+            "name" => match option.value {
+                ResolvedValue::String(value) => name = value.to_string(),
+                _ => return "Invalid value for name".to_string(),
+            },
+            "reactions" => match option.value {
+                ResolvedValue::String(value) => reactions = value.to_string(),
+                _ => return "Invalid value for reactions".to_string(),
+            },
+            _ => return "Invalid option".to_string(),
+        }
+    }
 
     let parsed_reactions = parse_reactions(reactions);
     if parsed_reactions.is_empty() {
         return "No reactions provided".to_string();
     }
 
-    db::add_board(
+    if let Err(err) = db::add_board(
         guild_id,
         name,
         parsed_reactions,
         Some(min_reactions),
         dest_channel,
-    );
+    ) {
+        return format!("Failed to create board: {}", err);
+    }
 
     "Board created successfully".to_string()
 }

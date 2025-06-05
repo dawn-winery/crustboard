@@ -1,8 +1,8 @@
 use std::env;
 
 use serenity::all::{
-    Channel, CreateEmbed, CreateEmbedAuthor, CreateMessage, EditMessage, EmbedAuthor, GetMessages,
-    MessageId,
+    Channel, Color, CreateEmbed, CreateEmbedAuthor, CreateMessage, EditMessage, EmbedAuthor,
+    GetMessages, MessageId,
 };
 use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
@@ -124,8 +124,8 @@ impl EventHandler for Handler {
                             // handle replies to messages
                             if let Some(referenced_message) = message.referenced_message.clone() {
                                 // create an embed with the referenced message
-                                dest_message = dest_message.add_embed(
-                                    CreateEmbed::new()
+                                dest_message = dest_message.add_embed({
+                                    let mut embed = CreateEmbed::new()
                                         .author(
                                             CreateEmbedAuthor::new(format!(
                                                 "Replying to {}",
@@ -140,13 +140,38 @@ impl EventHandler for Handler {
                                             ),
                                         )
                                         .description(referenced_message.content.to_string())
-                                        .timestamp(referenced_message.timestamp),
-                                );
+                                        .timestamp(referenced_message.timestamp);
+
+                                    for attachment in &referenced_message.attachments {
+                                        embed = embed.image(attachment.url.to_string());
+                                    }
+
+                                    embed
+                                });
+
+                                // add attachments
+                                if referenced_message.attachments.len() > 1 {
+                                    for attachment in &referenced_message.attachments {
+                                        dest_message = dest_message.add_embed(
+                                            CreateEmbed::new()
+                                                .image(attachment.url.to_string())
+                                                .color(Color::from_rgb(0x1d, 0xa0, 0xf2)),
+                                        );
+                                    }
+                                }
+
+                                // add embeds
+                                for embed in referenced_message.embeds {
+                                    dest_message = dest_message.add_embed(
+                                        CreateEmbed::from(embed)
+                                            .color(Color::from_rgb(0x63, 0x63, 0xff)),
+                                    );
+                                }
                             }
 
                             // create an embed with the author's message
-                            dest_message = dest_message.add_embed(
-                                CreateEmbed::new()
+                            dest_message = dest_message.add_embed({
+                                let mut embed = CreateEmbed::new()
                                     .author(
                                         CreateEmbedAuthor::new(&message.author.name)
                                             .url(message.link())
@@ -158,8 +183,34 @@ impl EventHandler for Handler {
                                             ),
                                     )
                                     .description(message.content.to_string())
-                                    .timestamp(message.timestamp),
-                            );
+                                    .color(Color::from_rgb(0xff, 0xe1, 0x9c))
+                                    .timestamp(message.timestamp);
+
+                                for attachment in &message.attachments {
+                                    embed = embed.image(attachment.url.to_string());
+                                }
+
+                                embed
+                            });
+
+                            // add attachments
+                            if message.attachments.len() > 1 {
+                                for attachment in &message.attachments {
+                                    dest_message = dest_message.add_embed(
+                                        CreateEmbed::new()
+                                            .image(attachment.url.to_string())
+                                            .color(Color::from_rgb(0x1d, 0xa0, 0xf2)),
+                                    );
+                                }
+                            }
+
+                            // add embeds
+                            for embed in message.embeds.clone() {
+                                dest_message = dest_message.add_embed(
+                                    CreateEmbed::from(embed)
+                                        .color(Color::from_rgb(0x63, 0x63, 0xff)),
+                                );
+                            }
 
                             // get channel matching dest_channel_id
                             match guild_channels

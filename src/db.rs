@@ -137,3 +137,43 @@ pub fn get_message_dest(guild_id: String, source_id: String) -> Result<String> {
 
     Ok(message_id)
 }
+
+// add a message to the messages table
+pub fn add_message(
+    guild_id: String,
+    board_name: String,
+    source_id: String,
+    dest_id: String,
+    reaction_count: i64,
+) -> Result<()> {
+    let conn = get_connection()?;
+
+    conn.execute(
+        "INSERT INTO messages
+            (board_id, source_id, dest_id, reaction_count)
+            VALUES ((SELECT board_id FROM boards WHERE guild_id = ? AND name = ?), ?, ?, ?)",
+        (guild_id, board_name, source_id, dest_id, reaction_count),
+    )?;
+
+    Ok(())
+}
+
+// update reaction count of a message
+pub fn update_message_reaction_count(
+    guild_id: String,
+    board_name: String,
+    source_id: String,
+    reaction_count: i64,
+) -> Result<()> {
+    let conn = get_connection()?;
+
+    conn.execute(
+        "UPDATE messages
+            SET reaction_count = ?
+            WHERE board_id = (SELECT board_id FROM boards WHERE guild_id = ? AND name = ?)
+                AND source_id = ?",
+        (reaction_count, guild_id, board_name, source_id),
+    )?;
+
+    Ok(())
+}

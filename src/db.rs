@@ -7,6 +7,13 @@ fn get_connection() -> Result<Connection> {
     Connection::open(DB_NAME)
 }
 
+pub struct Board {
+    pub name: String,
+    pub reactions: String,
+    pub min_reactions: i32,
+    pub dest_channel: String,
+}
+
 pub fn create_db() -> Result<()> {
     if !std::path::Path::new(DB_NAME).exists() {
         let conn = get_connection()?;
@@ -176,4 +183,45 @@ pub fn update_message_reaction_count(
     )?;
 
     Ok(())
+}
+
+// get all boards for a guild
+pub fn get_guild_boards(guild_id: String) -> Result<Vec<Board>> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT name, reactions, min_reactions, dest_channel
+            FROM boards
+            WHERE guild_id = ?",
+    )?;
+
+    stmt.query_map([guild_id], |row| {
+        Ok(Board {
+            name: row.get(0)?,
+            reactions: row.get(1)?,
+            min_reactions: row.get(2)?,
+            dest_channel: row.get(3)?,
+        })
+    })?
+    .collect::<Result<Vec<Board>>>()
+}
+
+// get a board by name
+pub fn get_board(guild_id: String, board_name: String) -> Result<Board> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT name, reactions, min_reactions, dest_channel
+            FROM boards
+            WHERE guild_id = ? AND name = ?",
+    )?;
+
+    stmt.query_row([guild_id, board_name], |row| {
+        Ok(Board {
+            name: row.get(0)?,
+            reactions: row.get(1)?,
+            min_reactions: row.get(2)?,
+            dest_channel: row.get(3)?,
+        })
+    })
 }

@@ -270,6 +270,16 @@ impl EventHandler for Handler {
                         None
                     }
                 }
+                "showboard" => {
+                    if let Some(guild_id) = command.guild_id {
+                        Some(commands::showboard::run(
+                            guild_id.to_string(),
+                            &command.data.options(),
+                        ))
+                    } else {
+                        None
+                    }
+                }
                 _ => Some("unimplemented".to_string()),
             };
 
@@ -285,6 +295,11 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         Command::create_global_command(&ctx.http, commands::addboard::register())
+            .await
+            .unwrap_or_else(|why| {
+                panic!("Cannot register command: {why}");
+            });
+        Command::create_global_command(&ctx.http, commands::showboard::register())
             .await
             .unwrap_or_else(|why| {
                 panic!("Cannot register command: {why}");

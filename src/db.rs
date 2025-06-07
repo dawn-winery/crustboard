@@ -130,11 +130,7 @@ pub fn edit_board(
             WHERE guild_id = ? AND name = ?",
         (
             new_name,
-            if reactions == None {
-                None
-            } else {
-                Some(to_csv(reactions.unwrap()))
-            },
+            reactions.map(|r| to_csv(r)),
             min_reactions,
             dest_channel,
             guild_id,

@@ -111,6 +111,40 @@ pub fn delete_board(guild_id: String, board_name: String) -> Result<()> {
     Ok(())
 }
 
+pub fn edit_board(
+    guild_id: String,
+    board_name: String,
+    new_name: Option<String>,
+    reactions: Option<Vec<ReactionType>>,
+    min_reactions: Option<i64>,
+    dest_channel: Option<String>,
+) -> Result<()> {
+    let conn = get_connection()?;
+
+    conn.execute(
+        "UPDATE boards
+            SET name = COALESCE(?, name),
+                reactions = COALESCE(?, reactions),
+                min_reactions = COALESCE(?, min_reactions),
+                dest_channel = COALESCE(?, dest_channel)
+            WHERE guild_id = ? AND name = ?",
+        (
+            new_name,
+            if reactions == None {
+                None
+            } else {
+                Some(to_csv(reactions.unwrap()))
+            },
+            min_reactions,
+            dest_channel,
+            guild_id,
+            board_name,
+        ),
+    )?;
+
+    Ok(())
+}
+
 // get board name, min_reactions and dest_channel given the boards contain passed ReactionType
 pub fn find_min_reactions(
     guild_id: String,

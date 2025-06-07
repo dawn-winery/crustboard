@@ -283,6 +283,17 @@ impl EventHandler for Handler {
                         None
                     }
                 }
+                "editboard" => {
+                    if let Some(guild_id) = command.guild_id {
+                        Some(commands::editboard::run(
+                            guild_id.to_string(),
+                            &command.data.options(),
+                        ))
+                    } else {
+                        None
+                    }
+                }
+
                 _ => Some("unimplemented".to_string()),
             };
 
@@ -311,6 +322,10 @@ impl EventHandler for Handler {
                 .expect("Failed to create command");
             ctx.http()
                 .create_guild_command(guild.id, &commands::deleteboard::register())
+                .await
+                .expect("Failed to create command");
+            ctx.http()
+                .create_guild_command(guild.id, &commands::editboard::register())
                 .await
                 .expect("Failed to create command");
         }

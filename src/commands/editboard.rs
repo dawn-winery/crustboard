@@ -1,107 +1,80 @@
 use crate::db;
-use serenity::all::InteractionContext;
-use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::prelude::*;
+use crate::{Context, Error};
+use poise::serenity_prelude as serenity;
 
-pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
-    let mut name = String::new();
-    let mut new_name: Option<String> = None;
-    let mut new_reactions: Option<String> = None;
-    let mut new_min_reactions: Option<i64> = None;
-    let mut new_dest_channel: Option<String> = None;
+#[poise::command(slash_command, guild_only, owners_only)]
+pub async fn editboard(
+    ctx: Context<'_>,
+    #[description = "Name of the board to edit"] name: String,
+    #[description = "New name for the board"] new_name: Option<String>,
+    #[description = "New destination channel"] dest_channel: Option<serenity::GuildChannel>,
+    #[description = "New reactions (space-separated)"] reactions: Option<String>,
+    #[description = "New minimum number of reactions"]
+    #[min = 1]
+    #[max = 50]
+    min_reactions: Option<i64>,
+) -> Result<(), Error> {
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command can only be used in a guild")?;
 
-    for option in options.iter() {
-        match option.name {
-            "name" => match option.value {
-                ResolvedValue::String(value) => name = value.to_string(),
-                _ => return "Invalid value for name".to_string(),
-            },
-            "new-name" => match option.value {
-                ResolvedValue::String(value) => new_name = Some(value.to_string()),
-                _ => return "Invalid value for new-name".to_string(),
-            },
-            "min-reactions" => match option.value {
-                ResolvedValue::Integer(value) => new_min_reactions = Some(value),
-                _ => return "Invalid value for min-reactions".to_string(),
-            },
-            "dest-channel" => match option.value {
-                ResolvedValue::Channel(value) => new_dest_channel = Some(value.id.to_string()),
-                _ => return "Invalid value for dest-channel".to_string(),
-            },
-            "reactions" => match option.value {
-                ResolvedValue::String(value) => new_reactions = Some(value.to_string()),
-                _ => return "Invalid value for reactions".to_string(),
-            },
-            _ => return "Invalid option".to_string(),
-        }
+    // check if board exists
+    if db::get_board(guild_id.to_string(), name.clone()).is_err() {
+        ctx.say(format!("Board '{}' not found!", name)).await?;
+        return Ok(());
     }
 
-    let parsed_reactions = {
-        if let Some(new_reactions) = new_reactions {
-            Some(crate::commands::parse_reactions(new_reactions))
-        } else {
-            None
+    // parse reactions if applicable
+    let parsed_reactions = if let Some(reactions_str) = reactions.clone() {
+        let parsed = crate::commands::parse_reactions(reactions_str);
+        if parsed.is_empty() {
+            ctx.say("No valid reactions provided. Please provide valid Unicode emojis or custom emojis in the format <:name:id>").await?;
+            return Ok(());
         }
+        Some(parsed)
+    } else {
+        None
     };
 
-    if let Err(err) = db::edit_board(
-        guild_id,
-        name,
-        new_name,
+    match db::edit_board(
+        guild_id.to_string(),
+        name.clone(),
+        new_name.clone(),
         parsed_reactions,
-        new_min_reactions,
-        new_dest_channel,
+        min_reactions,
+        dest_channel.as_ref().map(|c| c.id.to_string()),
     ) {
-        return format!("Failed to edit board: {}", err);
+        Ok(()) => {
+            let mut changes = Vec::new();
+            if let Some(new_name) = new_name {
+                changes.push(format!("name → {}", new_name));
+            }
+            if let Some(channel) = dest_channel {
+                changes.push(format!("destination → <#{}>", channel.id.to_string()));
+            }
+            if reactions.is_some() {
+                changes.push("reactions updated".to_string());
+            }
+            if let Some(min) = min_reactions {
+                changes.push(format!("min reactions → {}", min));
+            }
+
+            let changes_str = if changes.is_empty() {
+                "No changes made".to_string()
+            } else {
+                changes.join(", ")
+            };
+
+            ctx.say(format!(
+                "Board '{}' updated successfully! Changes: {}",
+                name, changes_str
+            ))
+            .await?;
+        }
+        Err(err) => {
+            ctx.say(format!("Failed to edit board: {}", err)).await?;
+        }
     }
 
-    "Board edited successfully".to_string()
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("editboard")
-        .description("Edit a board")
-        .add_context(InteractionContext::Guild)
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "name",
-                "The name of the board to edit",
-            )
-            .required(true),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "new-name",
-                "The new name of the board",
-            )
-            .required(false),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "reactions",
-                "The new reactions of the board",
-            )
-            .required(false),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Integer,
-                "min-reactions",
-                "The new minimum number of reactions required to pin",
-            )
-            .min_int_value(1)
-            .max_int_value(50)
-            .required(false),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Channel,
-                "dest-channel",
-                "The new channel of the board",
-            )
-            .required(false),
-        )
+    Ok(())
 }

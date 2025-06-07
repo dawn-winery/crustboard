@@ -1,34 +1,24 @@
 use crate::db;
-use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::prelude::*;
+use crate::{Context, Error};
 
-pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
-    if let Some(option) = options.first() {
-        if option.name == "name" {
-            match option.value {
-                ResolvedValue::String(value) => match db::delete_board(guild_id, value.to_string())
-                {
-                    Ok(_) => return "Board deleted successfully".to_string(),
-                    Err(err) => return format!("Error deleting board: {}", err),
-                },
-                _ => return "Invalid argument".to_string(),
-            }
+#[poise::command(slash_command, guild_only, owners_only)]
+pub async fn deleteboard(
+    ctx: Context<'_>,
+    #[description = "Name of the board to delete"] name: String,
+) -> Result<(), Error> {
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command can only be used in a guild")?;
+
+    match db::delete_board(guild_id.to_string(), name.clone()) {
+        Ok(()) => {
+            ctx.say(format!("Board '{}' deleted successfully!", name))
+                .await?;
+        }
+        Err(err) => {
+            ctx.say(format!("Failed to delete board: {}", err)).await?;
         }
     }
 
-    "No value provided".to_string()
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("deleteboard")
-        .description("Deletes a board")
-        .add_context(InteractionContext::Guild)
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "name",
-                "The name of the board to delete",
-            )
-            .required(true),
-        )
+    Ok(())
 }

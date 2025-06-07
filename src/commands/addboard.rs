@@ -1,85 +1,48 @@
 use crate::db;
-use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::prelude::*;
+use crate::{Context, Error};
+use poise::serenity_prelude as serenity;
 
-pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
-    let mut min_reactions: i64 = 1;
-    let mut dest_channel: String = String::new();
-    let mut name: String = String::new();
-    let mut reactions: String = String::new();
-
-    for option in options.iter() {
-        match option.name {
-            "min-reactions" => match option.value {
-                ResolvedValue::Integer(value) => min_reactions = value,
-                _ => return "Invalid value for min-reactions".to_string(),
-            },
-            "dest-channel" => match option.value {
-                ResolvedValue::Channel(value) => dest_channel = value.id.to_string(),
-                _ => return "Invalid value for dest-channel".to_string(),
-            },
-            "name" => match option.value {
-                ResolvedValue::String(value) => name = value.to_string(),
-                _ => return "Invalid value for name".to_string(),
-            },
-            "reactions" => match option.value {
-                ResolvedValue::String(value) => reactions = value.to_string(),
-                _ => return "Invalid value for reactions".to_string(),
-            },
-            _ => return "Invalid option".to_string(),
-        }
-    }
+#[poise::command(slash_command, guild_only, owners_only)]
+pub async fn addboard(
+    ctx: Context<'_>,
+    #[description = "Name of the board"] name: String,
+    #[description = "Channel where the board will post messages"]
+    dest_channel: serenity::GuildChannel,
+    #[description = "Reactions to use for the board (space-separated)"] reactions: String,
+    #[description = "Minimum number of reactions"]
+    #[min = 1]
+    #[max = 50]
+    min_reactions: Option<i64>,
+) -> Result<(), Error> {
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command can only be used in a guild")?;
 
     let parsed_reactions = crate::commands::parse_reactions(reactions);
     if parsed_reactions.is_empty() {
-        return "No reactions provided".to_string();
+        ctx.say("No valid reactions provided. Please provide valid Unicode emojis or custom emojis in the format <:name:id>").await?;
+        return Ok(());
     }
 
-    if let Err(err) = db::add_board(
-        guild_id,
-        name,
+    match db::add_board(
+        guild_id.to_string(),
+        name.clone(),
         parsed_reactions,
-        Some(min_reactions),
-        dest_channel,
+        min_reactions,
+        dest_channel.id.to_string(),
     ) {
-        return format!("Failed to create board: {}", err);
+        Ok(()) => {
+            ctx.say(format!(
+                "Board '{}' created successfully! Messages with {} or more reactions will be posted to <#{}>",
+                name,
+                min_reactions.unwrap_or(1),
+                dest_channel.id.to_string()
+            )).await?;
+        }
+        Err(err) => {
+            ctx.say(format!("Failed to create board: {}", err)).await?;
+        }
     }
 
-    "Board created successfully".to_string()
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("addboard")
-        .description("Create a new board")
-        .add_context(InteractionContext::Guild)
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "name", "Name of board")
-                .required(true),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Channel,
-                "dest-channel",
-                "Channel where the board will post messages",
-            )
-            .required(true),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::String,
-                "reactions",
-                "Reactions to use for the board",
-            )
-            .required(true),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Integer,
-                "min-reactions",
-                "Minimum number of reactions",
-            )
-            .min_int_value(1)
-            .max_int_value(50)
-            .required(false),
-        )
+    Ok(())
 }

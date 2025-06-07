@@ -1,49 +1,72 @@
 use crate::db;
-use serenity::all::InteractionContext;
-use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::prelude::*;
+use crate::{Context, Error};
 
-pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
-    let mut board_name: String = String::new();
+#[poise::command(slash_command, guild_only)]
+pub async fn showboard(
+    ctx: Context<'_>,
+    #[description = "Name of a specific board to show (optional)"] name: Option<String>,
+) -> Result<(), Error> {
+    let guild_id = ctx
+        .guild_id()
+        .ok_or("This command can only be used in a guild")?;
 
-    for option in options.iter() {
-        if option.name == "name" {
-            match option.value {
-                ResolvedValue::String(val) => board_name = val.to_string(),
-                _ => return "Invalid value for name".to_string(),
+    match name {
+        Some(board_name) => {
+            // specific board
+            match db::get_board(guild_id.to_string(), board_name.clone()) {
+                Ok(board) => {
+                    let reactions = db::from_csv(board.reactions);
+                    let reaction_str = reactions
+                        .iter()
+                        .map(|r| r.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+
+                    ctx.say(format!(
+                        "**Board: {}**\n**Destination:** <#{}>\n**Reactions:** {}\n**Min Reactions:** {}",
+                        board.name,
+                        board.dest_channel,
+                        reaction_str,
+                        board.min_reactions
+                    )).await?;
+                }
+                Err(_) => {
+                    ctx.say(format!("Board '{}' not found!", board_name))
+                        .await?;
+                }
             }
-        } else {
-            return "Invalid option".to_string();
+        }
+        None => {
+            // all boards
+            match db::get_guild_boards(guild_id.to_string()) {
+                Ok(boards) => {
+                    if boards.is_empty() {
+                        ctx.say("No boards found in this server!").await?;
+                    } else {
+                        let mut response = "**Server Boards:**\n\n".to_string();
+                        for board in boards {
+                            let reactions = db::from_csv(board.reactions);
+                            let reaction_str = reactions
+                                .iter()
+                                .map(|r| r.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" ");
+
+                            response.push_str(&format!(
+                                "**{}** → <#{}> ({}+ reactions: {})\n",
+                                board.name, board.dest_channel, board.min_reactions, reaction_str
+                            ));
+                        }
+                        ctx.say(response).await?;
+                    }
+                }
+                Err(err) => {
+                    ctx.say(format!("Failed to retrieve boards: {}", err))
+                        .await?;
+                }
+            }
         }
     }
 
-    let mut output = "## Boards\n".to_string();
-    if board_name.is_empty() {
-        // show all boards
-        let boards = db::get_guild_boards(guild_id).unwrap();
-        for board in boards {
-            output.push_str(&format!(
-                "- {}    **|**    {}    **|**    **{}**    **|**    <#{}>\n",
-                board.name, board.reactions, board.min_reactions, board.dest_channel
-            ));
-        }
-        output
-    } else {
-        // show specific board
-        let board = db::get_board(guild_id, board_name).unwrap();
-        output.push_str(&format!(
-            "- {}    **|**    {}    **|**    **{}**    **|**    <#{}>\n",
-            board.name, board.reactions, board.min_reactions, board.dest_channel
-        ));
-        output
-    }
-}
-pub fn register() -> CreateCommand {
-    CreateCommand::new("showboard")
-        .description("Displays boards")
-        .add_context(InteractionContext::Guild)
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "name", "Name of board")
-                .required(false),
-        )
+    Ok(())
 }

@@ -3,7 +3,6 @@
 Starboard replacement, wip
 
 TODO:
-- permissions?
 - per-guild leaderboard?
 
 COMPLETED:
@@ -13,3 +12,4 @@ COMPLETED:
 - `/deleteboard <name>`
 - sending messages to dest-channel
 - editing messages to update reaction count
+- permissions

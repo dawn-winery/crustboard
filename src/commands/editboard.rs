@@ -1,7 +1,7 @@
 use crate::db;
-use serenity::all::{InteractionContext, ReactionType};
+use serenity::all::InteractionContext;
 use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::application::{CommandOptionType, ResolvedOption, ResolvedValue};
+use serenity::model::prelude::*;
 
 pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
     let mut name = String::new();

@@ -39,7 +39,6 @@ impl EventHandler for Handler {
                 } else {
                     users.len()
                 };
-                println!("got {count} reactions"); // DEBUG
 
                 // get list of (boards, min_reactions) for the given reaction
                 let min_reactions = db::find_min_reactions(guild_id.to_string(), added.emoji)
@@ -50,8 +49,6 @@ impl EventHandler for Handler {
                     .iter()
                     .filter(|&(_, min, _)| min <= &count)
                     .collect::<Vec<_>>();
-
-                println!("min_reactions: {:?}", min_reactions); // DEBUG
 
                 // get all channels
                 let guild_channels = ctx
@@ -310,24 +307,21 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         db::create_db().expect("Failed to create database");
 
-        // create commands in each guild
+        // set commands in each guild
         for guild in ready.guilds {
-            ctx.http()
-                .create_guild_command(guild.id, &commands::addboard::register())
+            guild
+                .id
+                .set_commands(
+                    &ctx.http,
+                    vec![
+                        commands::addboard::register(),
+                        commands::showboard::register(),
+                        commands::deleteboard::register(),
+                        commands::editboard::register(),
+                    ],
+                )
                 .await
-                .expect("Failed to create command");
-            ctx.http()
-                .create_guild_command(guild.id, &commands::showboard::register())
-                .await
-                .expect("Failed to create command");
-            ctx.http()
-                .create_guild_command(guild.id, &commands::deleteboard::register())
-                .await
-                .expect("Failed to create command");
-            ctx.http()
-                .create_guild_command(guild.id, &commands::editboard::register())
-                .await
-                .expect("Failed to create command");
+                .expect("Failed to set guild commands");
         }
 
         println!("{} is connected!", ready.user.name);

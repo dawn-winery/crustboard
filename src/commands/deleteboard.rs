@@ -1,6 +1,6 @@
 use crate::db;
 use serenity::builder::{CreateCommand, CreateCommandOption};
-use serenity::model::application::{CommandOptionType, ResolvedOption, ResolvedValue};
+use serenity::model::prelude::*;
 
 pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
     if let Some(option) = options.first() {
@@ -22,6 +22,7 @@ pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
 pub fn register() -> CreateCommand {
     CreateCommand::new("deleteboard")
         .description("Deletes a board")
+        .add_context(InteractionContext::Guild)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,

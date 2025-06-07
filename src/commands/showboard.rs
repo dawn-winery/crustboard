@@ -1,5 +1,5 @@
 use crate::db;
-use serenity::all::{InteractionContext, ReactionType};
+use serenity::all::InteractionContext;
 use serenity::builder::{CreateCommand, CreateCommandOption};
 use serenity::model::application::{CommandOptionType, ResolvedOption, ResolvedValue};
 

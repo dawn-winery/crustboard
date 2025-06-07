@@ -1,5 +1,5 @@
 use crate::db;
-use serenity::all::ReactionType;
+use serenity::all::{InteractionContext, ReactionType};
 use serenity::builder::{CreateCommand, CreateCommandOption};
 use serenity::model::application::{CommandOptionType, ResolvedOption, ResolvedValue};
 
@@ -81,6 +81,7 @@ pub fn run(guild_id: String, options: &[ResolvedOption]) -> String {
 pub fn register() -> CreateCommand {
     CreateCommand::new("addboard")
         .description("Create a new board")
+        .add_context(InteractionContext::Guild)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "name", "Name of board")
                 .required(true),

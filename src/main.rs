@@ -1,16 +1,9 @@
 use std::env;
 
-use serenity::all::{
-    Channel, Color, CreateEmbed, CreateEmbedAuthor, CreateMessage, EditMessage, EmbedAuthor,
-    GetMessages, MessageId,
-};
+use serenity::all::{Color, CreateEmbed, CreateEmbedAuthor, CreateMessage, EditMessage, MessageId};
 use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
-use serenity::model::{
-    application::{Command, Interaction},
-    channel::{Message, Reaction},
-    gateway::Ready,
-};
+use serenity::model::{application::Interaction, channel::Reaction, gateway::Ready};
 use serenity::prelude::*;
 
 pub mod db;
@@ -270,6 +263,16 @@ impl EventHandler for Handler {
                         None
                     }
                 }
+                "deleteboard" => {
+                    if let Some(guild_id) = command.guild_id {
+                        Some(commands::deleteboard::run(
+                            guild_id.to_string(),
+                            &command.data.options(),
+                        ))
+                    } else {
+                        None
+                    }
+                }
                 "showboard" => {
                     if let Some(guild_id) = command.guild_id {
                         Some(commands::showboard::run(
@@ -294,18 +297,23 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        Command::create_global_command(&ctx.http, commands::addboard::register())
-            .await
-            .unwrap_or_else(|why| {
-                panic!("Cannot register command: {why}");
-            });
-        Command::create_global_command(&ctx.http, commands::showboard::register())
-            .await
-            .unwrap_or_else(|why| {
-                panic!("Cannot register command: {why}");
-            });
-
         db::create_db().expect("Failed to create database");
+
+        // create commands in each guild
+        for guild in ready.guilds {
+            ctx.http()
+                .create_guild_command(guild.id, &commands::addboard::register())
+                .await
+                .expect("Failed to create command");
+            ctx.http()
+                .create_guild_command(guild.id, &commands::showboard::register())
+                .await
+                .expect("Failed to create command");
+            ctx.http()
+                .create_guild_command(guild.id, &commands::deleteboard::register())
+                .await
+                .expect("Failed to create command");
+        }
 
         println!("{} is connected!", ready.user.name);
     }

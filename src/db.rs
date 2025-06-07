@@ -1,5 +1,5 @@
-use rusqlite::{Connection, Error, Result};
-use serenity::model::channel::{Reaction, ReactionType};
+use rusqlite::{Connection, Result};
+use serenity::model::channel::ReactionType;
 
 const DB_NAME: &str = "settings.db";
 
@@ -47,7 +47,7 @@ pub fn create_db() -> Result<()> {
                 board_id INTEGER,
                 reaction_count INTEGER,
 
-                FOREIGN KEY(board_id) REFERENCES boards(board_id)
+                FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
             )",
             (),
         )?;

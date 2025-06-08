@@ -1,4 +1,4 @@
-use serenity::all::ReactionType;
+use poise::serenity_prelude::*;
 
 pub mod addboard;
 pub mod deleteboard;

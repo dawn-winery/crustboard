@@ -1,5 +1,5 @@
 use poise::serenity_prelude as serenity;
-use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions};
+use poise::{Framework, FrameworkOptions};
 use serenity::{
     Client, Context as SerenityContext, GatewayIntents,
     all::{Color, CreateEmbed, CreateEmbedAuthor, CreateMessage, EditMessage, MessageId, Reaction},

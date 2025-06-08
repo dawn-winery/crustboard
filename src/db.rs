@@ -1,5 +1,5 @@
+use poise::serenity_prelude::*;
 use rusqlite::{Connection, Result};
-use serenity::model::channel::ReactionType;
 
 const DB_NAME: &str = "settings.db";
 

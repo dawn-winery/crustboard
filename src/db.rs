@@ -34,6 +34,7 @@ pub fn create_db() -> Result<()> {
             (),
         )?;
 
+        // user_id holds the user ID of the user that posted the message
         // source_id holds the message ID of the message that passed the reaction threshold
         // dest_id holds the message ID of the message that was posted to the board
         // board_id holds the ID of the board that the message reached the threshold for
@@ -42,6 +43,7 @@ pub fn create_db() -> Result<()> {
             "CREATE TABLE messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+                user_id TEXT,
                 source_id TEXT,
                 dest_id TEXT,
                 board_id INTEGER,
@@ -179,6 +181,7 @@ pub fn get_message_dest(guild_id: String, source_id: String) -> Result<String> {
 pub fn add_message(
     guild_id: String,
     board_name: String,
+    user_id: String,
     source_id: String,
     dest_id: String,
     reaction_count: i64,
@@ -187,9 +190,16 @@ pub fn add_message(
 
     conn.execute(
         "INSERT INTO messages
-            (board_id, source_id, dest_id, reaction_count)
-            VALUES ((SELECT board_id FROM boards WHERE guild_id = ? AND name = ?), ?, ?, ?)",
-        (guild_id, board_name, source_id, dest_id, reaction_count),
+            (board_id, user_id, source_id, dest_id, reaction_count)
+            VALUES ((SELECT board_id FROM boards WHERE guild_id = ? AND name = ?), ?, ?, ?, ?)",
+        (
+            guild_id,
+            board_name,
+            user_id,
+            source_id,
+            dest_id,
+            reaction_count,
+        ),
     )?;
 
     Ok(())
@@ -254,4 +264,63 @@ pub fn get_board(guild_id: String, board_name: String) -> Result<Board> {
             dest_channel: row.get(3)?,
         })
     })
+}
+
+pub fn get_board_user_reactions(
+    guild_id: String,
+    board_name: String,
+) -> Result<Vec<(UserId, u64)>> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT user_id, reaction_count
+            FROM messages
+            WHERE board_id = (SELECT board_id FROM boards WHERE guild_id = ? AND name = ?)",
+    )?;
+
+    let mut user_counts = std::collections::HashMap::new();
+
+    stmt.query_map([guild_id, board_name], |row| {
+        Ok((row.get::<usize, String>(0)?, row.get::<usize, u64>(1)?))
+    })?
+    .filter_map(|result| match result {
+        Ok((user_id_str, count)) => match user_id_str.parse::<u64>() {
+            Ok(id) => Some((UserId::new(id), count)),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    })
+    .for_each(|(user_id, count)| {
+        *user_counts.entry(user_id).or_insert(0) += count;
+    });
+
+    Ok(user_counts.into_iter().collect::<Vec<(UserId, u64)>>())
+}
+
+pub fn get_guild_user_reactions(guild_id: String) -> Result<Vec<(UserId, u64)>> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT user_id, reaction_count
+            FROM messages
+            WHERE board_id = (SELECT board_id FROM boards WHERE guild_id = ?)",
+    )?;
+
+    let mut user_counts = std::collections::HashMap::new();
+
+    stmt.query_map([guild_id], |row| {
+        Ok((row.get::<usize, String>(0)?, row.get::<usize, u64>(1)?))
+    })?
+    .filter_map(|result| match result {
+        Ok((user_id_str, count)) => match user_id_str.parse::<u64>() {
+            Ok(id) => Some((UserId::new(id), count)),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    })
+    .for_each(|(user_id, count)| {
+        *user_counts.entry(user_id).or_insert(0) += count;
+    });
+
+    Ok(user_counts.into_iter().collect::<Vec<(UserId, u64)>>())
 }

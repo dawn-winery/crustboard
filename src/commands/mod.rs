@@ -3,11 +3,13 @@ use poise::serenity_prelude::*;
 pub mod addboard;
 pub mod deleteboard;
 pub mod editboard;
+pub mod leaderboard;
 pub mod showboard;
 
 pub use addboard::addboard;
 pub use deleteboard::deleteboard;
 pub use editboard::editboard;
+pub use leaderboard::leaderboard;
 pub use showboard::showboard;
 
 pub fn parse_reactions(reactions: String) -> Vec<ReactionType> {

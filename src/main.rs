@@ -226,6 +226,7 @@ async fn create_board_message(
     db::add_message(
         guild_id.to_string(),
         board_name.to_string(),
+        message.author.id.to_string(),
         message.id.to_string(),
         dest_msg.id.to_string(),
         count as i64,
@@ -236,6 +237,8 @@ async fn create_board_message(
 
 #[tokio::main]
 async fn main() {
+    db::create_db().expect("Failed to create database");
+
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
     let framework = Framework::builder()
@@ -245,15 +248,27 @@ async fn main() {
                 commands::deleteboard(),
                 commands::showboard(),
                 commands::editboard(),
+                commands::leaderboard(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
             ..Default::default()
         })
-        .setup(|ctx, _ready, framework| {
+        .setup(|ctx, ready, framework| {
             Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                println!("Registering commands in {} guilds", ready.guilds.len());
+                for guild in &ready.guilds {
+                    if let Err(e) = poise::builtins::register_in_guild(
+                        ctx,
+                        &framework.options().commands,
+                        guild.id,
+                    )
+                    .await
+                    {
+                        println!("Failed to register commands in guild {}: {}", guild.id, e);
+                    }
+                }
                 Ok(Data {})
             })
         })

@@ -1,5 +1,9 @@
-use crate::{Context, Error, commands::autocomplete_board_names, db};
-use poise::{CreateReply, serenity_prelude::*};
+use crate::{
+    Context, Error,
+    commands::{autocomplete_board_names, create_reply},
+    db,
+};
+use poise::serenity_prelude::*;
 
 #[poise::command(slash_command, guild_only)]
 pub async fn moststarred(
@@ -32,60 +36,14 @@ pub async fn moststarred(
                 let channel_id = ChannelId::new(board.dest_channel.parse().unwrap());
 
                 match ctx.http().get_message(channel_id, message_id).await {
-                    Ok(message) => {
-                        let reply = ctx.reply_builder(CreateReply {
-                            content: Some(message.content),
-                            embeds: message
-                                .embeds
-                                .iter()
-                                .map(|e| {
-                                    let mut embed = CreateEmbed::new();
-                                    if let Some(author) = &e.author {
-                                        embed =
-                                            embed.author(CreateEmbedAuthor::from(author.clone()));
-                                    }
-                                    if let Some(color) = e.colour {
-                                        embed = embed.color(color);
-                                    }
-                                    if let Some(description) = &e.description {
-                                        embed = embed.description(description.clone());
-                                    }
-                                    if let Some(footer) = &e.footer {
-                                        embed =
-                                            embed.footer(CreateEmbedFooter::from(footer.clone()));
-                                    }
-                                    if let Some(image) = &e.image {
-                                        embed = embed.image(image.url.clone());
-                                    }
-                                    if let Some(timestamp) = e.timestamp {
-                                        embed = embed.timestamp(timestamp);
-                                    }
-                                    if let Some(url) = &e.url {
-                                        embed = embed.url(url);
-                                    }
-
-                                    embed
-                                })
-                                .collect(),
-                            attachments: {
-                                let mut attachments = Vec::new();
-                                for attachment in message.attachments {
-                                    attachments.push(
-                                        CreateAttachment::url(ctx.http(), attachment.url.as_str())
-                                            .await?,
-                                    );
-                                }
-                                attachments
-                            },
-                            ephemeral: None,
-                            components: None,
-                            allowed_mentions: None,
-                            reply: false,
-                            __non_exhaustive: (),
-                        });
-
-                        ctx.send(reply).await?;
-                    }
+                    Ok(message) => match create_reply(ctx, message).await {
+                        Ok(reply) => {
+                            ctx.send(reply).await?;
+                        }
+                        Err(err) => {
+                            ctx.say(format!("Could not create reply: {}", err)).await?;
+                        }
+                    },
                     Err(err) => {
                         ctx.say(format!("Message not found: {}", err)).await?;
                     }

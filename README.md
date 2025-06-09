@@ -9,3 +9,4 @@ Starboard replacement
 - `/deleteboard <name>`
 - `/leaderboard <name>?`
 - `/moststarred <name>?`
+- `/random <name>?`

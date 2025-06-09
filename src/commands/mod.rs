@@ -3,6 +3,7 @@ pub mod deleteboard;
 pub mod editboard;
 pub mod leaderboard;
 pub mod moststarred;
+pub mod random;
 pub mod showboard;
 
 pub use addboard::addboard;
@@ -10,12 +11,12 @@ pub use deleteboard::deleteboard;
 pub use editboard::editboard;
 pub use leaderboard::leaderboard;
 pub use moststarred::moststarred;
+pub use random::random;
 pub use showboard::showboard;
 
-use crate::Context;
-use crate::db;
+use crate::{Context, Error, db};
 use futures::{Stream, StreamExt};
-use poise::serenity_prelude::*;
+use poise::{CreateReply, serenity_prelude::*};
 
 pub fn parse_reactions(reactions: String) -> Vec<ReactionType> {
     let mut parsed_reactions = Vec::new();
@@ -60,4 +61,52 @@ pub async fn autocomplete_board_names<'a>(
     futures::stream::iter(board_names)
         .filter(move |name| futures::future::ready(name.starts_with(partial)))
         .map(|name| name.to_string())
+}
+
+pub async fn create_reply(ctx: Context<'_>, message: Message) -> Result<CreateReply, Error> {
+    Ok(ctx.reply_builder(CreateReply {
+        content: Some(message.content),
+        embeds: message
+            .embeds
+            .iter()
+            .map(|e| {
+                let mut embed = CreateEmbed::new();
+                if let Some(author) = &e.author {
+                    embed = embed.author(CreateEmbedAuthor::from(author.clone()));
+                }
+                if let Some(color) = e.colour {
+                    embed = embed.color(color);
+                }
+                if let Some(description) = &e.description {
+                    embed = embed.description(description.clone());
+                }
+                if let Some(footer) = &e.footer {
+                    embed = embed.footer(CreateEmbedFooter::from(footer.clone()));
+                }
+                if let Some(image) = &e.image {
+                    embed = embed.image(image.url.clone());
+                }
+                if let Some(timestamp) = e.timestamp {
+                    embed = embed.timestamp(timestamp);
+                }
+                if let Some(url) = &e.url {
+                    embed = embed.url(url);
+                }
+
+                embed
+            })
+            .collect(),
+        attachments: {
+            let mut attachments = Vec::new();
+            for attachment in message.attachments {
+                attachments.push(CreateAttachment::url(ctx.http(), attachment.url.as_str()).await?);
+            }
+            attachments
+        },
+        ephemeral: None,
+        components: None,
+        allowed_mentions: None,
+        reply: false,
+        __non_exhaustive: (),
+    }))
 }

@@ -18,7 +18,7 @@ pub struct Message {
     pub user_id: String,
     pub source_id: String,
     pub dest_id: String,
-    pub board_id: String,
+    pub board_id: i64,
     pub reaction_count: i64,
 }
 
@@ -236,7 +236,7 @@ pub fn get_guild_messages(guild_id: impl ToString) -> Result<Vec<Message>> {
                 user_id: row.get(0)?,
                 source_id: row.get(1)?,
                 dest_id: row.get(2)?,
-                board_id: row.get::<usize, i64>(3)?.to_string(),
+                board_id: row.get::<usize, i64>(3)?,
                 reaction_count: row.get(4)?,
             })
         })?
@@ -250,8 +250,8 @@ pub fn get_board_messages(
 ) -> Result<Vec<Message>> {
     let conn = get_connection()?;
 
-    let board_id: String = conn.query_row(
-        "SELECT board_id FROM boards WHERE guild_id = ? AND board_name = ?",
+    let board_id: i64 = conn.query_row(
+        "SELECT board_id FROM boards WHERE guild_id = ? AND name = ?",
         (guild_id.to_string(), board_name.to_string()),
         |row| row.get(0),
     )?;
@@ -263,12 +263,12 @@ pub fn get_board_messages(
     )?;
 
     Ok(stmt
-        .query_map([board_id.clone()], |row| {
+        .query_map([board_id], |row| {
             Ok(Message {
                 user_id: row.get(0)?,
                 source_id: row.get(1)?,
                 dest_id: row.get(2)?,
-                board_id: board_id.clone(),
+                board_id: board_id,
                 reaction_count: row.get(3)?,
             })
         })?

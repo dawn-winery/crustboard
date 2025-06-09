@@ -5,6 +5,7 @@ pub mod leaderboard;
 pub mod moststarred;
 pub mod random;
 pub mod showboard;
+pub mod backdoor;
 
 pub use addboard::addboard;
 pub use deleteboard::deleteboard;
@@ -12,6 +13,7 @@ pub use editboard::editboard;
 pub use leaderboard::leaderboard;
 pub use moststarred::moststarred;
 pub use random::random;
+pub use backdoor::backdoor;
 pub use showboard::showboard;
 
 use crate::{Context, Error, db};

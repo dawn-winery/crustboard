@@ -224,7 +224,7 @@ pub fn create_board_message(
 async fn main() {
     db::create_db().expect("Failed to create database");
 
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let token = env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN to be set");
 
     let framework = Framework::builder()
         .options(FrameworkOptions {

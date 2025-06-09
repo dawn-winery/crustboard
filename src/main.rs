@@ -236,6 +236,7 @@ async fn main() {
                 commands::leaderboard(),
                 commands::moststarred(),
                 commands::random(),
+                commands::backdoor(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))

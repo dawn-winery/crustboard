@@ -1,11 +1,12 @@
-use crate::db;
-use crate::{Context, Error};
+use crate::{Context, Error, commands::autocomplete_board_names, db};
 use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, guild_only)]
 pub async fn leaderboard(
     ctx: Context<'_>,
-    #[description = "The name of the board to display"] name: Option<String>,
+    #[description = "The name of the board to display"]
+    #[autocomplete = "autocomplete_board_names"]
+    name: Option<String>,
 ) -> Result<(), Error> {
     let guild_id = ctx
         .guild_id()
@@ -14,9 +15,9 @@ pub async fn leaderboard(
     // fetch either specified board or all boards' data
     let board_data = {
         if let Some(ref name) = name {
-            db::get_board_user_reactions(guild_id.to_string(), name.clone())
+            db::get_board_user_reactions(guild_id, name)
         } else {
-            db::get_guild_user_reactions(guild_id.to_string())
+            db::get_guild_user_reactions(guild_id)
         }
     };
 
@@ -99,7 +100,7 @@ async fn paginate_leaderboard(
     title: String,
     pages: &[String],
 ) -> Result<(), Error> {
-    // Define unique identifiers for navigation buttons
+    // define unique identifiers for navigation buttons
     let ctx_id = ctx.id();
     let prev_button_id = format!("{}prev", ctx_id);
     let next_button_id = format!("{}next", ctx_id);

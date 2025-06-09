@@ -1,11 +1,16 @@
-use crate::db;
-use crate::{Context, Error};
+use crate::{
+    Context, Error,
+    commands::{autocomplete_board_names, parse_reactions},
+    db,
+};
 use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, guild_only, owners_only)]
 pub async fn addboard(
     ctx: Context<'_>,
-    #[description = "Name of the board"] name: String,
+    #[description = "Name of the board"]
+    #[autocomplete = "autocomplete_board_names"]
+    name: String,
     #[description = "Channel where the board will post messages"]
     dest_channel: serenity::GuildChannel,
     #[description = "Reactions to use for the board (space-separated)"] reactions: String,
@@ -18,18 +23,18 @@ pub async fn addboard(
         .guild_id()
         .ok_or("This command can only be used in a guild")?;
 
-    let parsed_reactions = crate::commands::parse_reactions(reactions);
+    let parsed_reactions = parse_reactions(reactions);
     if parsed_reactions.is_empty() {
         ctx.say("No valid reactions provided. Please provide valid Unicode emojis or custom emojis in the format <:name:id>").await?;
         return Ok(());
     }
 
     match db::add_board(
-        guild_id.to_string(),
-        name.clone(),
+        guild_id,
+        &name,
         parsed_reactions,
         min_reactions,
-        dest_channel.id.to_string(),
+        dest_channel.id,
     ) {
         Ok(()) => {
             ctx.say(format!(

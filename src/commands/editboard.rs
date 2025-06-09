@@ -1,11 +1,12 @@
-use crate::db;
-use crate::{Context, Error};
+use crate::{Context, Error, commands::autocomplete_board_names, db};
 use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, guild_only, owners_only)]
 pub async fn editboard(
     ctx: Context<'_>,
-    #[description = "Name of the board to edit"] name: String,
+    #[description = "Name of the board to edit"]
+    #[autocomplete = "autocomplete_board_names"]
+    name: String,
     #[description = "New name for the board"] new_name: Option<String>,
     #[description = "New destination channel"] dest_channel: Option<serenity::GuildChannel>,
     #[description = "New reactions (space-separated)"] reactions: Option<String>,
@@ -37,12 +38,12 @@ pub async fn editboard(
     };
 
     match db::edit_board(
-        guild_id.to_string(),
-        name.clone(),
+        guild_id,
+        &name,
         new_name.clone(),
         parsed_reactions,
         min_reactions,
-        dest_channel.as_ref().map(|c| c.id.to_string()),
+        dest_channel.as_ref(),
     ) {
         Ok(()) => {
             let mut changes = Vec::new();

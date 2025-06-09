@@ -8,3 +8,4 @@ Starboard replacement
 - `/editboard <name> <dest-channel>? <reactions>? <min_reactions>?`
 - `/deleteboard <name>`
 - `/leaderboard <name>?`
+- `/moststarred <name>?`

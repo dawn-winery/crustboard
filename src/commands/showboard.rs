@@ -1,10 +1,11 @@
-use crate::db;
-use crate::{Context, Error};
+use crate::{Context, Error, commands::autocomplete_board_names, db};
 
 #[poise::command(slash_command, guild_only)]
 pub async fn showboard(
     ctx: Context<'_>,
-    #[description = "Name of a specific board to show (optional)"] name: Option<String>,
+    #[description = "Name of a specific board to show (optional)"]
+    #[autocomplete = "autocomplete_board_names"]
+    name: Option<String>,
 ) -> Result<(), Error> {
     let guild_id = ctx
         .guild_id()
@@ -13,7 +14,7 @@ pub async fn showboard(
     match name {
         Some(board_name) => {
             // specific board
-            match db::get_board(guild_id.to_string(), board_name.clone()) {
+            match db::get_board(guild_id, &board_name) {
                 Ok(board) => {
                     let reactions = db::from_csv(board.reactions);
                     let reaction_str = reactions
@@ -38,7 +39,7 @@ pub async fn showboard(
         }
         None => {
             // all boards
-            match db::get_guild_boards(guild_id.to_string()) {
+            match db::get_guild_boards(guild_id) {
                 Ok(boards) => {
                     if boards.is_empty() {
                         ctx.say("No boards found in this server!").await?;

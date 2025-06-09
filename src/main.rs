@@ -99,25 +99,29 @@ async fn handle_reaction_add(ctx: &SerenityContext, added: Reaction) -> Result<(
                     println!("Error editing message: {}", err);
                 }
 
-                db::update_message_reaction_count(
-                    guild_id.to_string(),
-                    board_name.to_string(),
-                    dest_id,
-                    count as i64,
-                )?;
+                db::update_message_reaction_count(guild_id, board_name, dest_id, count as i64)?;
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 // create new message
-                create_board_message(
-                    ctx,
-                    &message,
-                    board_name,
-                    count,
-                    dest_channel_id,
-                    &guild_channels,
+                let dest_message = create_board_message(&message, board_name, count)?;
+
+                // send to destination channel
+                let channel = guild_channels
+                    .iter()
+                    .find(|channel| &channel.id.to_string() == dest_channel_id)
+                    .ok_or("Destination channel not found")?;
+
+                let dest_msg = channel.send_message(&ctx.http, dest_message).await?;
+
+                // save to database
+                db::add_message(
                     guild_id,
-                )
-                .await?;
+                    board_name,
+                    message.author.id,
+                    message.id,
+                    dest_msg.id,
+                    count as i64,
+                )?;
             }
             Err(err) => {
                 println!("Database error: {}", err);
@@ -128,18 +132,17 @@ async fn handle_reaction_add(ctx: &SerenityContext, added: Reaction) -> Result<(
     Ok(())
 }
 
-async fn create_board_message(
-    ctx: &SerenityContext,
+pub fn create_board_message(
     message: &serenity::Message,
-    board_name: &str,
+    board_name: impl AsRef<str>,
     count: usize,
-    dest_channel_id: &str,
-    guild_channels: &[serenity::GuildChannel],
-    guild_id: serenity::GuildId,
-) -> Result<(), Error> {
+) -> Result<CreateMessage, Error> {
     let mut dest_message = CreateMessage::new().content(format!(
         "{} **| {} Reactions |** <#{}> **({})**",
-        board_name, count, message.channel_id, message.author
+        board_name.as_ref(),
+        count,
+        message.channel_id,
+        message.author
     ));
 
     // handle reply
@@ -214,25 +217,7 @@ async fn create_board_message(
             .add_embed(CreateEmbed::from(embed).color(Color::from_rgb(0x63, 0x63, 0xff)));
     }
 
-    // send to destination channel
-    let channel = guild_channels
-        .iter()
-        .find(|channel| &channel.id.to_string() == dest_channel_id)
-        .ok_or("Destination channel not found")?;
-
-    let dest_msg = channel.send_message(&ctx.http, dest_message).await?;
-
-    // save to database
-    db::add_message(
-        guild_id.to_string(),
-        board_name.to_string(),
-        message.author.id.to_string(),
-        message.id.to_string(),
-        dest_msg.id.to_string(),
-        count as i64,
-    )?;
-
-    Ok(())
+    Ok(dest_message)
 }
 
 #[tokio::main]
@@ -249,6 +234,7 @@ async fn main() {
                 commands::showboard(),
                 commands::editboard(),
                 commands::leaderboard(),
+                commands::moststarred(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
